@@ -1,14 +1,21 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 using StudentInformation.Models;
 
 namespace StudentInformation.Controllers
 {
     public class StudentController : Controller
     {
-        // static List to store Student temporarily
-        private static List<Student> students = new List<Student>();
-        public IActionResult Index()
+        private readonly StudentDB _context;
+
+        public StudentController(StudentDB context)
         {
+            _context = context;
+        }
+        [HttpGet]
+        public async Task<IActionResult> Index()
+        {
+            var students = await _context.Student.ToListAsync();
             return View(students);
         }
 
@@ -18,73 +25,78 @@ namespace StudentInformation.Controllers
         }
 
         [HttpPost]
-        public IActionResult RegisterStudent(Student student)
+        public async Task<IActionResult> RegisterStudent(Student student)
         {
             if (ModelState.IsValid)
             {
-                student.Id = students.Count + 1;
-                students.Add(student);
+                
+                _context.Student.Add(student);
+                await _context.SaveChangesAsync();
                 return RedirectToAction("Index");
             }
             return View(student);
         }
 
         // GET: /Pets/Edit/5
-        public IActionResult Edit(int id)
+        public async Task<IActionResult> Edit(int id)
         {
-            var student = students.FirstOrDefault(s => s.Id == id);
+            var student = await _context.Student.FindAsync(id);
             if (student == null)
                 return NotFound();
             return View(student);
         }
 
-        // POST: /Pets/Edit/id
+        // POST: /Student/Edit/5
         [HttpPost]
-        public IActionResult Edit(int id, Student student)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Edit(int id, Student student)
         {
             if (id != student.Id)
                 return NotFound();
 
             if (ModelState.IsValid)
             {
-                var existingStudent = students.FirstOrDefault(s => s.Id == id);
-                if (existingStudent == null)
-                    return NotFound();
-
-                // Update pet details
-                existingStudent.FirstName = student.FirstName;
-                existingStudent.MiddleName = student.MiddleName;
-                existingStudent.LastName = student.LastName;
-                existingStudent.ContactNumber = student.ContactNumber;
-                existingStudent.Address = student.Address;
-
-                return RedirectToAction("Index");
+                try
+                {
+                    _context.Update(student);
+                    await _context.SaveChangesAsync();
+                    return RedirectToAction("Index");
+                }
+                catch (DbUpdateConcurrencyException)
+                {
+                    if (!_context.Student.Any(s => s.Id == id))
+                        return NotFound();
+                    else
+                        throw;
+                }
             }
             return View(student);
         }
 
-        // GET: /Pets/Delete/id
-
-        public IActionResult Delete(int id)
+        // GET: /Student/Delete/5
+        public async Task<IActionResult> Delete(int id)
         {
-            var student = students.FirstOrDefault(s => s.Id == id);
+            var student = await _context.Student.FindAsync(id);
             if (student == null)
                 return NotFound();
-            return View(student);
+
+            return View(student); // Shows confirmation page
         }
 
-        // POST: /Pets/Delete/id
-
+        // POST: /Student/Delete/5
         [HttpPost, ActionName("Delete")]
-
-        public IActionResult DeleteConfirmed(int id)
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> DeleteConfirmed(int id)
         {
-            var pet = students.FirstOrDefault(s => s.Id == id);
-            if (pet != null)
-            {
-                students.Remove(pet);
-            }
+            var student = await _context.Student.FindAsync(id);
+            if (student == null)
+                return NotFound();
+
+            _context.Student.Remove(student);
+            await _context.SaveChangesAsync();
+
             return RedirectToAction("Index");
         }
+
     }
 }
